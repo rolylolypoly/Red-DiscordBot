@@ -1,4 +1,6 @@
+import os
 import discord
+import ipgetter
 from discord.ext import commands
 from .utils.chat_formatting import *
 from random import randint
@@ -7,6 +9,7 @@ import datetime
 import time
 import aiohttp
 import asyncio
+import json
 
 settings = {"POLL_DURATION" : 60}
 
@@ -26,6 +29,62 @@ class General:
     async def ping(self):
         """Pong."""
         await self.bot.say("Pong.")
+
+    @commands.command(hidden=True)
+    async def ping(self):
+        """Pong."""
+        await self.bot.say("Pong.")
+
+    @commands.command()
+    async def andrewinit(self):
+        await self.bot.say("yes")
+        data = {"axe": 0, "pick": 0, "shovel": 0, "hoe": 0, "hotpocket": 0}
+        await self.bot.say(os.getcwd())
+        with open('andrew.text', 'w') as outfile:
+            json.dump(data, outfile)
+        await self.bot.say(data)
+
+    @commands.command()
+    async def andrew(self, type: str):
+        if type.lower() == "axe":
+            with open('andrew.text') as infile:
+                data = json.load(infile)
+                data["axe"] += 1
+            with open('andrew.text', 'w') as outfile:
+                json.dump(data, outfile)
+        elif type.lower() == "pick":
+            with open('andrew.text') as infile:
+                data = json.load(infile)
+                data["axe"] += 1
+            with open('andrew.text', 'w') as outfile:
+                json.dump(data, outfile)
+        elif type.lower() == "shovel":
+            with open('andrew.text') as infile:
+                data = json.load(infile)
+                data["axe"] += 1
+            with open('andrew.text', 'w') as outfile:
+                json.dump(data, outfile)
+        elif type.lower() == "hoe":
+            with open('andrew.text') as infile:
+                data = json.load(infile)
+                data["axe"] += 1
+            with open('andrew.text', 'w') as outfile:
+                json.dump(data, outfile)
+        elif type.lower() == "hotpocket":
+            with open('andrew.text') as infile:
+                data = json.load(infile)
+                data["hotpocket"] += 1
+            with open('andrew.text', 'w') as outfile:
+                json.dump(data, outfile)
+        else:
+            with open('andrew.text') as infile:
+                await self.bot.say(json.load(infile))
+
+    @commands.command()
+    async def ip(self):
+        """Prints IP of the aircraft-carrier"""
+        await self.bot.say(ipgetter.myip())
+
 
     @commands.command()
     async def choose(self, *choices):
