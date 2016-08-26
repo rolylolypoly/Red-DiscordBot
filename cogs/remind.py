@@ -11,21 +11,21 @@ class Remind:
     def __init__(self, bot):
         self.bot = bot
 
-    def hello(self):
-        print('hello {} ({:.4f})'.format(self, time.time()))
+    async def hello(self, string: str):
+        await self.bot.say('hello {} ({:.4f})'.format(string, time.time()))
         time.sleep(.3)
 
-    def do_every(self, period, function, *args):
+    async def do_every(self, period, function, *args):
         def g_tick():
             t = time.time()
             count = 0
-            while True:
+            while self.Tick:
                 count += 1
                 yield max(t + count*period - time.time(), 0)
         g = g_tick()
-        while True:
+        while self.Tick:
             time.sleep(next(g))
-            function(*args)
+            await function(*args)
 
     async def jsonwrite(self, data):
         await self.bot.say(os.getcwd())
@@ -49,15 +49,13 @@ class Remind:
     async def ticktest(self, state: str):
         if state.lower() == "on":
             self.Tick = True
+            await self.bot.say("On.")
         elif state.lower() == "off":
             self.Tick = False
+            await self.bot.say("Off.")
         else:
-            self.bot.say(self.Tick)
-
-    @commands.command()
-    async def ticktest(self):
-        self.bot.say(self.Tick)
-        self.do_every(1, self.hello(), 'bweep')
+            await self.bot.say(self.Tick)
+            await self.do_every(1, self.hello, 'bweep')
 
     @commands.command()
     async def jsonread(self):
