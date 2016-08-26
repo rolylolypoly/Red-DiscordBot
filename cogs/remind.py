@@ -1,12 +1,31 @@
 import os
 import json
 import discord
+import time
 from discord.ext import commands
 
 
 class Remind:
+    Tick = False
+
     def __init__(self, bot):
         self.bot = bot
+
+    def hello(self):
+        print('hello {} ({:.4f})'.format(self, time.time()))
+        time.sleep(.3)
+
+    def do_every(self, period, function, *args):
+        def g_tick():
+            t = time.time()
+            count = 0
+            while True:
+                count += 1
+                yield max(t + count*period - time.time(), 0)
+        g = g_tick()
+        while True:
+            time.sleep(next(g))
+            function(*args)
 
     async def jsonwrite(self, data):
         await self.bot.say(os.getcwd())
@@ -25,6 +44,20 @@ class Remind:
     async def parse2(self, recipient, message, time, meta):
         data = {"recipient": recipient, "message": message, "time": time, "meta": meta}
         self.jsonwrite(data)
+
+    @commands.command()
+    async def ticktest(self, state: str):
+        if state.lower() == "on":
+            self.Tick = True
+        elif state.lower() == "off":
+            self.Tick = False
+        else:
+            self.bot.say(self.Tick)
+
+    @commands.command()
+    async def ticktest(self):
+        self.bot.say(self.Tick)
+        self.do_every(1, self.hello(), 'bweep')
 
     @commands.command()
     async def jsonread(self):
