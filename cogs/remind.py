@@ -2,6 +2,7 @@ import os
 import json
 import discord
 import time
+from .utils.dataIO import dataIO
 from discord.ext import commands
 
 
@@ -27,23 +28,12 @@ class Remind:
             time.sleep(next(g))
             await function(*args)
 
-    async def jsonwrite(self, data):
-        await self.bot.say(os.getcwd())
-        await self.bot.say(data)
-        with open('data.txt', 'w') as outfile:
-            json.dump(data, outfile)
-
     async def parse1(self, potato):
-        await self.bot.say(potato)
-        await self.bot.say(potato[0])
-        await self.bot.say(potato[1])
-        await self.bot.say(potato.index("at", 2, potato.__len__()) + 1)
-        await self.bot.say(potato[(potato.index("at", 2, potato.__len__()) + 1):])
-        await self.bot.say(''.join(str(e) + " " for e in potato[2, potato.__len__()]))
+        await self.parse2(potato[0], potato[1], potato[2], time.time())
 
     async def parse2(self, recipient, message, time, meta):
         data = {"recipient": recipient, "message": message, "time": time, "meta": meta}
-        self.jsonwrite(data)
+        await dataIO.save_json('data.txt', data)
 
     @commands.command()
     async def ticktest(self, state: str):
@@ -57,19 +47,15 @@ class Remind:
             await self.bot.say(self.Tick)
             await self.do_every(1, self.hello, 'bweep')
 
-    @commands.command()
-    async def jsonread(self):
-        await self.bot.say(os.getcwd())
-        with open('data.txt') as infile:
-            data = (json.load(infile))
-        await self.bot.say(data)
-
     @commands.command(pass_context=True)
     async def remind(self, ctx, *poop):
         """This is supposed to do stuff."""
         author = ctx.message.author
         await self.bot.say("I will remind " + author.mention)
-        await self.parse1(poop)
+        if poop == 'list':
+            await self.bot.say(dataIO.load_json())
+        else:
+            await self.parse1(poop)
 
     @commands.command()
     async def pwd(self):
@@ -78,7 +64,7 @@ class Remind:
     @commands.command()
     async def datatest(self):
         data = [1, 2, 3, 4, 5]
-        await self.jsonwrite(data)
+        await dataIO.save_json('data.txt', data)
 
 
 def setup(bot):
