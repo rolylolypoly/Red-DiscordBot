@@ -1,5 +1,4 @@
 import os
-import json
 import discord
 import time
 from .utils.dataIO import dataIO
@@ -22,17 +21,29 @@ class Remind:
             count = 0
             while self.Tick:
                 count += 1
-                yield max(t + count*period - time.time(), 0)
+                yield max(t + count * period - time.time(), 0)
+
         g = g_tick()
         while self.Tick:
             time.sleep(next(g))
             await function(*args)
 
-    async def parse1(self, potato):
-        await self.parse2(potato[0], potato[1], potato[2], time.time())
+    async def parse1(self, string, author):
 
-    async def parse2(self, recipient, message, time, meta):
-        data = {"recipient": recipient, "message": message, "time": time, "meta": meta}
+        await self.parse2(string[0],
+                          string[2],
+                          string[string.index('at')],
+                          author)
+
+    async def parse2(self, recipient, message, when, author):
+        data = {"recipient": recipient,
+                "message": message,
+                "when": when,
+                "meta":
+                    {"timestamp": time.time(),
+                     "author": author
+                     }
+                }
         await dataIO.save_json('data.txt', data)
 
     @commands.command()
@@ -51,11 +62,10 @@ class Remind:
     async def remind(self, ctx, *poop):
         """This is supposed to do stuff."""
         author = ctx.message.author
-        await self.bot.say("I will remind " + author.mention)
         if poop == 'list':
-            await self.bot.say(dataIO.load_json())
+            await self.bot.say(dataIO.load_json('data.txt'))
         else:
-            await self.parse1(poop)
+            await self.parse1(poop, author)
 
     @commands.command()
     async def pwd(self):
