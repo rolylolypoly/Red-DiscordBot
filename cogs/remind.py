@@ -1,6 +1,7 @@
 import os
 import discord
 import time
+import uuid
 from .utils.dataIO import dataIO
 from discord.ext import commands
 
@@ -31,8 +32,8 @@ class Remind:
     async def parse1(self, string, author):
 
         await self.parse2(string[0],
-                          string[2],
-                          string[string.index('at')],
+                          string[2:string.index('at')],
+                          string[(string.index('at') + 1):string.__len__()],
                           author)
 
     async def parse2(self, recipient, message, when, author):
@@ -41,10 +42,12 @@ class Remind:
                 "when": when,
                 "meta":
                     {"timestamp": time.time(),
-                     "author": author
+                     "author": author,
+                     "uuid": str(uuid.uuid4())
                      }
                 }
-        await dataIO.save_json('data.txt', data)
+        dataIO.save_json('data.txt', data)
+        await self.bot.say("Data saved.")
 
     @commands.command()
     async def ticktest(self, state: str):
@@ -65,7 +68,7 @@ class Remind:
         if poop == 'list':
             await self.bot.say(dataIO.load_json('data.txt'))
         else:
-            await self.parse1(poop, author)
+            await self.parse1(poop, str(author))
 
     @commands.command()
     async def pwd(self):
