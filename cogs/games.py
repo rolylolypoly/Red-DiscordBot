@@ -11,12 +11,12 @@ class GameRanks:
     def __init__(self, bot):
         self.bot = bot
         try:
-            self.games = dataIO.load_json('data/ranks/ranks.json')
+            self.games = dataIO.load_json('data/games/games.json')
         except FileNotFoundError:
             self.games = {}
 
     def write_json(self):
-        dataIO.save_json('data/ranks/ranks.json', self.games)
+        dataIO.save_json('data/games/games.json', self.games)
 
     @commands.command(pass_context=True)
     async def gamedebug(self, ctx):
