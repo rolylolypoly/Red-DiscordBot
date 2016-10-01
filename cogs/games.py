@@ -40,9 +40,9 @@ class GameRanks:
         if not server.id in self.games or not role.id in self.games[server.id]:
             await self.bot.say('The requested role is not available as a game')
         else:
-            await self.bot.say(str(ctx.message.author.roles.len()))
+            await self.bot.say(str(len(ctx.message.author.roles)))
             ctx.message.author.roles.append(role)
-            await self.bot.say(str(ctx.message.author.roles.len()))
+            await self.bot.say(str(len(ctx.message.author.roles)))
             await self.bot.say('Role added')
 
     @commands.command(pass_context=True)

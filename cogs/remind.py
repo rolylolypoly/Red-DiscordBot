@@ -80,6 +80,14 @@ class Remind:
     async def datatest(self):
         await self.bot.say(dataIO.load_json("data.txt"))
 
+    @commands.command(pass_context=True)
+    async def mentiontest(self, ctx):
+        server = ctx.message.server
+        for member in list(server.members):
+            await self.bot.say(member.id)
+            if int(member.id).__eq__(153269807213576192):
+                self.bot.say(member.mention)
+
 
 def setup(bot):
     bot.add_cog(Remind(bot))
