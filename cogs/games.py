@@ -1,6 +1,7 @@
 import discord
 import json
 import inspect
+import os
 from discord.ext import commands
 from .utils.dataIO import dataIO
 from .utils import checks
@@ -16,7 +17,13 @@ class GameRanks:
             self.games = {}
 
     def write_json(self):
-        dataIO.save_json('data/games/games.json', self.games)
+        filename = 'data/games/games.json'
+        dir = os.path.dirname(filename)
+        try:
+            os.stat(dir)
+        except:
+            os.mkdir(dir)
+        dataIO.save_json(filename, self.games)
 
     @commands.command(pass_context=True)
     async def gamedebug(self, ctx):
