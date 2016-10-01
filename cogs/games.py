@@ -2,6 +2,7 @@ import discord
 import json
 from discord.ext import commands
 from .utils.dataIO import dataIO
+from .utils import checks
 
 def GameRanks:
     """Allows users to recieve select roles on command."""
