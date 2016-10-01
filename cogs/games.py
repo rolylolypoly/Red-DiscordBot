@@ -22,7 +22,7 @@ class GameRanks:
     async def gamedebug(self, ctx):
         server = ctx.message.server
         await self.bot.say(ctx.message.author.mention)
-        for key,val in inspect.getmembers(server):
+        for key,val in inspect.getmembers(server.roles[0]):
             await self.bot.say(key)
 
     @commands.command()
