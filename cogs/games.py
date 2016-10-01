@@ -18,7 +18,7 @@ class GameRanks:
         dataIO.save_json('data/ranks/ranks.json', self.games)
 
     @commands.command()
-    async def gamedebug(self):
+    async def gamedebug(self, ctx):
         server = ctx.message.server
         self.bot.say(ctx.message.author)
         for key in server.keys():
