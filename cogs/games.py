@@ -23,7 +23,7 @@ class GameRanks:
         server = ctx.message.server
         await self.bot.say(ctx.message.author.mention)
         for key,val in inspect.getmembers(server.members):
-            await self.bot.say(key + ':' + val)
+            await self.bot.say(str(key) + ':' + str(val))
 
     @commands.command(pass_context=True)
     async def game(self, ctx, role : discord.Role):
