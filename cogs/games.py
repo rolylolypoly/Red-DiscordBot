@@ -20,7 +20,7 @@ class GameRanks:
     @commands.command(pass_context=True)
     async def gamedebug(self, ctx):
         server = ctx.message.server
-        await self.bot.say(ctx.message.author)
+        await self.bot.say(ctx.message.author.mention)
         for key in server.keys():
             await self.bot.say(key)
 
