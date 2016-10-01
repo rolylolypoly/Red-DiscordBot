@@ -37,15 +37,17 @@ class Remind:
                           author)
 
     async def parse2(self, recipient, message, when, author):
-        data = {"recipient": recipient,
-                "message": message,
-                "when": when,
-                "meta":
-                    {"timestamp": time.time(),
-                     "author": author,
-                     "uuid": str(uuid.uuid4())
+        data = {str(when):
+                    {"recipient": recipient,
+                     "message": message,
+                     "meta":
+                         {"timestamp": time.time(),
+                          "author": author,
+                          "uuid": str(uuid.uuid4())
+                          }
                      }
                 }
+        data.update(dataIO.load_json("data.txt"))
         dataIO.save_json('data.txt', data)
         await self.bot.say("Data saved.")
 
@@ -76,8 +78,7 @@ class Remind:
 
     @commands.command()
     async def datatest(self):
-        data = [1, 2, 3, 4, 5]
-        await dataIO.save_json('data.txt', data)
+        await self.bot.say(dataIO.load_json("data.txt"))
 
 
 def setup(bot):
