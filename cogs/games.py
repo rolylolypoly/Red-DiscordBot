@@ -16,6 +16,7 @@ def GameRanks:
     def write_json(self):
         dataIO.save_json('data/ranks/ranks.json', self.ranks);
 
+    @commands.command()
     async def gamedebug(self, ctx):
         server = ctx.message.server
         self.bot.say(ctx.message.author)
