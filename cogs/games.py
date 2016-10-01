@@ -4,7 +4,7 @@ from discord.ext import commands
 from .utils.dataIO import dataIO
 from .utils import checks
 
-def GameRanks:
+class GameRanks:
     """Allows users to recieve select roles on command."""
 
     def __init__(self, bot):
