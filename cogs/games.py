@@ -24,7 +24,7 @@ class GameRanks:
         #await self.bot.say(ctx.message.author.mention)
         for key,val in inspect.getmembers(list(server.members)[0]):
         #for member in list(server.members):
-            await self.bot.say(str(key) + ': ' + type(val))
+            await self.bot.say(str(key) + ': ' + str(type(val)))
 
     @commands.command(pass_context=True)
     async def game(self, ctx, role : discord.Role):
