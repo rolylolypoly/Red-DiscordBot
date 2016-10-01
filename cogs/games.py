@@ -21,7 +21,7 @@ class GameRanks:
     async def gamedebug(self, ctx):
         server = ctx.message.server
         self.bot.say(ctx.message.author)
-        for _,key in vars(server).iteritems():
+        for key in servers.keys():
             self.bot.say(key)
 
     @commands.command()
