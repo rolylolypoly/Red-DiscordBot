@@ -1,5 +1,6 @@
 import discord
 import json
+import inspect
 from discord.ext import commands
 from .utils.dataIO import dataIO
 from .utils import checks
@@ -21,7 +22,7 @@ class GameRanks:
     async def gamedebug(self, ctx):
         server = ctx.message.server
         await self.bot.say(ctx.message.author.mention)
-        for key in server.keys():
+        for key,val in inspect.getmembers(server):
             await self.bot.say(key)
 
     @commands.command()
