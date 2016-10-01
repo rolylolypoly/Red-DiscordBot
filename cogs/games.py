@@ -32,7 +32,7 @@ def GameRanks:
         else:
             self.bot.say('todo')
 
-    @Commands.command()
+    @commands.command()
     @checks.mod_or_permissions(manage_server=True)
     async def addgame(self, ctx, role : discord.Role):
         """Administration of joinable ranks."""
