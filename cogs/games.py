@@ -17,12 +17,12 @@ class GameRanks:
     def write_json(self):
         dataIO.save_json('data/ranks/ranks.json', self.games)
 
-    @commands.command()
+    @commands.command(pass_context=True)
     async def gamedebug(self, ctx):
         server = ctx.message.server
-        self.bot.say(ctx.message.author)
+        await self.bot.say(ctx.message.author)
         for key in server.keys():
-            self.bot.say(key)
+            await self.bot.say(key)
 
     @commands.command()
     async def game(self, ctx, role : discord.Role):
