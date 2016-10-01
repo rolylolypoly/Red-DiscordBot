@@ -33,7 +33,8 @@ class GameRanks:
         if not server.id in self.games or not role.id in self.games[server.id]:
             await self.bot.say('The requested role is not available as a game')
         else:
-            await self.bot.say('todo')
+            ctx.message.author.roles.append(role)
+            await self.bot.say('Role added')
 
     @commands.command(pass_context=True)
     @checks.mod_or_permissions(manage_server=True)
@@ -44,8 +45,6 @@ class GameRanks:
             self.games[server.id] = []
         self.games[server.id].append(role.id)
         self.write_json()
-
-
 
 def setup(bot):
     bot.add_cog(GameRanks(bot))
