@@ -66,11 +66,10 @@ class Remind:
     @commands.command(pass_context=True)
     async def remind(self, ctx, *poop):
         """This is supposed to do stuff."""
-        author = ctx.message.author
         if poop == 'list':
             await self.bot.say(dataIO.load_json('data.txt'))
         else:
-            await self.parse1(poop, str(author))
+            await self.parse1(poop, str(ctx.message.author.id))
 
     @commands.command()
     async def pwd(self):
@@ -84,8 +83,9 @@ class Remind:
     async def mentiontest(self, ctx):
         server = ctx.message.server
         for member in list(server.members):
-            if int(member.id).__eq__(153269807213576192):
+            if int(member.id).__eq__(141678385024729088):
                 await self.bot.say(member.mention)
+                await self.bot.say(ctx.message.author.id)
 
 
 def setup(bot):
