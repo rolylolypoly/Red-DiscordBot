@@ -1,6 +1,6 @@
 import discord
 from discord.ext import commands
-from cogs.utils.dataIO import dataIO, fileIO
+from cogs.utils.dataIO import dataIO
 from collections import namedtuple, defaultdict
 from datetime import datetime
 from random import randint
@@ -11,7 +11,7 @@ import os
 import time
 import logging
 
-default_settings = {"PAYDAY_TIME" : 300, "PAYDAY_CREDITS" : 120, "SLOT_MIN" : 5, "SLOT_MAX" : 100, "SLOT_TIME" : 0}
+default_settings = {"PAYDAY_TIME" : 300, "PAYDAY_CREDITS" : 120, "SLOT_MIN" : 5, "SLOT_MAX" : 100, "SLOT_TIME" : 0, "REGISTER_CREDITS" : 0}
 
 slot_payouts = """Slot machine payouts:
     :two: :two: :six: Bet * 5000
@@ -23,23 +23,30 @@ slot_payouts = """Slot machine payouts:
     Three symbols: +500
     Two symbols: Bet * 2"""
 
+
 class BankError(Exception):
     pass
+
 
 class AccountAlreadyExists(BankError):
     pass
 
+
 class NoAccount(BankError):
     pass
+
 
 class InsufficientBalance(BankError):
     pass
 
+
 class NegativeValue(BankError):
     pass
 
+
 class SameSenderAndReceiver(BankError):
     pass
+
 
 class Bank:
     def __init__(self, bot, file_path):
@@ -106,7 +113,6 @@ class Bank:
         self._save_bank()
 
     def transfer_credits(self, sender, receiver, amount):
-        server = sender.server
         if amount < 0:
             raise NegativeValue()
         if sender is receiver:
@@ -195,7 +201,8 @@ class Economy:
         global default_settings
         self.bot = bot
         self.bank = Bank(bot, "data/economy/bank.json")
-        self.settings = fileIO("data/economy/settings.json", "load")
+        self.file_path = "data/economy/settings.json"
+        self.settings = dataIO.load_json(self.file_path)
         if "PAYDAY_TIME" in self.settings: #old format
             default_settings = self.settings
             self.settings = {}
@@ -213,8 +220,11 @@ class Economy:
     async def register(self, ctx):
         """Registers an account at the Twentysix bank"""
         user = ctx.message.author
+        credits = 0
+        if ctx.message.server.id in self.settings:
+            credits = self.settings[ctx.message.server.id].get("REGISTER_CREDITS", 0)
         try:
-            account = self.bank.create_account(user)
+            account = self.bank.create_account(user, initial_balance=credits)
             await self.bot.say("{} Account opened. Current balance: {}".format(user.mention,
                 account.balance))
         except AccountAlreadyExists:
@@ -231,7 +241,7 @@ class Economy:
                 await self.bot.say("{} Your balance is: {}".format(user.mention, self.bank.get_balance(user)))
             except NoAccount:
                 await self.bot.say("{} You don't have an account at the Twentysix bank."
-                 " Type {}bank register to open one.".format(user.mention, ctx.prefix))
+                 " Type `{}bank register` to open one.".format(user.mention, ctx.prefix))
         else:
             try:
                 await self.bot.say("{}'s balance is {}".format(user.name, self.bank.get_balance(user)))
@@ -290,7 +300,7 @@ class Economy:
                 self.bank.deposit_credits(author, self.settings[server.id]["PAYDAY_CREDITS"])
                 await self.bot.say("{} Here, take some credits. Enjoy! (+{} credits!)".format(author.mention, str(self.settings[server.id]["PAYDAY_CREDITS"])))
         else:
-            await self.bot.say("{} You need an account to receive credits. Type {}bank register to open one.".format(author.mention, ctx.prefix))
+            await self.bot.say("{} You need an account to receive credits. Type `{}bank register` to open one.".format(author.mention, ctx.prefix))
 
     @commands.group(pass_context=True)
     async def leaderboard(self, ctx):
@@ -376,7 +386,7 @@ class Economy:
         author = ctx.message.author
         server = author.server
         if not self.bank.account_exists(author):
-            await self.bot.say("{} You need an account to use the slot machine. Type {}bank register to open one.".format(author.mention, ctx.prefix))
+            await self.bot.say("{} You need an account to use the slot machine. Type `{}bank register` to open one.".format(author.mention, ctx.prefix))
             return
         if self.bank.can_spend(author, bid):
             if bid >= self.settings[server.id]["SLOT_MIN"] and bid <= self.settings[server.id]["SLOT_MAX"]:
@@ -460,7 +470,7 @@ class Economy:
         server = ctx.message.server
         self.settings[server.id]["SLOT_MIN"] = bid
         await self.bot.say("Minimum bid is now " + str(bid) + " credits.")
-        fileIO("data/economy/settings.json", "save", self.settings)
+        dataIO.save_json(self.file_path, self.settings)
 
     @economyset.command(pass_context=True)
     async def slotmax(self, ctx, bid : int):
@@ -468,7 +478,7 @@ class Economy:
         server = ctx.message.server
         self.settings[server.id]["SLOT_MAX"] = bid
         await self.bot.say("Maximum bid is now " + str(bid) + " credits.")
-        fileIO("data/economy/settings.json", "save", self.settings)
+        dataIO.save_json(self.file_path, self.settings)
 
     @economyset.command(pass_context=True)
     async def slottime(self, ctx, seconds : int):
@@ -476,7 +486,7 @@ class Economy:
         server = ctx.message.server
         self.settings[server.id]["SLOT_TIME"] = seconds
         await self.bot.say("Cooldown is now " + str(seconds) + " seconds.")
-        fileIO("data/economy/settings.json", "save", self.settings)
+        dataIO.save_json(self.file_path, self.settings)
 
     @economyset.command(pass_context=True)
     async def paydaytime(self, ctx, seconds : int):
@@ -484,7 +494,7 @@ class Economy:
         server = ctx.message.server
         self.settings[server.id]["PAYDAY_TIME"] = seconds
         await self.bot.say("Value modified. At least " + str(seconds) + " seconds must pass between each payday.")
-        fileIO("data/economy/settings.json", "save", self.settings)
+        dataIO.save_json(self.file_path, self.settings)
 
     @economyset.command(pass_context=True)
     async def paydaycredits(self, ctx, credits : int):
@@ -492,10 +502,20 @@ class Economy:
         server = ctx.message.server
         self.settings[server.id]["PAYDAY_CREDITS"] = credits
         await self.bot.say("Every payday will now give " + str(credits) + " credits.")
-        fileIO("data/economy/settings.json", "save", self.settings)
+        dataIO.save_json(self.file_path, self.settings)
 
-    def display_time(self, seconds, granularity=2): # What would I ever do without stackoverflow?
-        intervals = (                               # Source: http://stackoverflow.com/a/24542445
+    @economyset.command(pass_context=True)
+    async def registercredits(self, ctx, credits : int):
+        """Credits given on registering an account"""
+        server = ctx.message.server
+        if credits < 0:
+            credits = 0
+        self.settings[server.id]["REGISTER_CREDITS"] = credits
+        await self.bot.say("Registering an account will now give {} credits.".format(credits))
+        dataIO.save_json(self.file_path, self.settings)
+
+    def display_time(self, seconds, granularity=2):  # What would I ever do without stackoverflow?
+        intervals = (                                # Source: http://stackoverflow.com/a/24542445
             ('weeks', 604800),  # 60 * 60 * 24 * 7
             ('days', 86400),    # 60 * 60 * 24
             ('hours', 3600),    # 60 * 60
@@ -514,29 +534,32 @@ class Economy:
                 result.append("{} {}".format(value, name))
         return ', '.join(result[:granularity])
 
+
 def check_folders():
     if not os.path.exists("data/economy"):
         print("Creating data/economy folder...")
         os.makedirs("data/economy")
 
+
 def check_files():
 
     f = "data/economy/settings.json"
-    if not fileIO(f, "check"):
+    if not dataIO.is_valid_json(f):
         print("Creating default economy's settings.json...")
-        fileIO(f, "save", {})
+        dataIO.save_json(f, {})
 
     f = "data/economy/bank.json"
-    if not fileIO(f, "check"):
+    if not dataIO.is_valid_json(f):
         print("Creating empty bank.json...")
-        fileIO(f, "save", {})
+        dataIO.save_json(f, {})
+
 
 def setup(bot):
     global logger
     check_folders()
     check_files()
     logger = logging.getLogger("red.economy")
-    if logger.level == 0: # Prevents the logger from being loaded again in case of module reload
+    if logger.level == 0:  # Prevents the logger from being loaded again in case of module reload
         logger.setLevel(logging.INFO)
         handler = logging.FileHandler(filename='data/economy/economy.log', encoding='utf-8', mode='a')
         handler.setFormatter(logging.Formatter('%(asctime)s %(message)s', datefmt="[%d/%m/%Y %H:%M]"))

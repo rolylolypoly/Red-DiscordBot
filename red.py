@@ -1,8 +1,3 @@
-from discord.ext import commands
-import discord
-from cogs.utils.settings import Settings
-from cogs.utils.dataIO import dataIO
-from cogs.utils.chat_formatting import inline
 import asyncio
 import os
 import time
@@ -11,24 +6,191 @@ import logging
 import logging.handlers
 import shutil
 import traceback
+import datetime
+
+try:
+    assert sys.version_info >= (3, 5)
+    from discord.ext import commands
+    import discord
+except ImportError:
+    print("Discord.py is not installed.\n"
+          "Consult the guide for your operating system "
+          "and do ALL the steps in order.\n"
+          "https://twentysix26.github.io/Red-Docs/\n")
+    sys.exit()
+except AssertionError:
+    print("Red needs Python 3.5 or superior.\n"
+          "Consult the guide for your operating system "
+          "and do ALL the steps in order.\n"
+          "https://twentysix26.github.io/Red-Docs/\n")
+    sys.exit()
+
+from cogs.utils.settings import Settings
+from cogs.utils.dataIO import dataIO
+from cogs.utils.chat_formatting import inline
+from collections import Counter
 
 #
-#  Red, a Discord bot by Twentysix, based on discord.py and its command extension
+# Red, a Discord bot by Twentysix, based on discord.py and its command
+#                             extension.
+#
 #                   https://github.com/Twentysix26/
 #
 #
-# red.py and cogs/utils/checks.py both contain some modified functions originally made by Rapptz
-#             https://github.com/Rapptz/RoboDanny/tree/async
+# red.py and cogs/utils/checks.py both contain some modified functions
+#                     originally made by Rapptz.
+#
+#                 https://github.com/Rapptz/RoboDanny/
 #
 
 description = "Red - A multifunction Discord bot by Twentysix"
 
-formatter = commands.HelpFormatter(show_check_failure=False)
 
-bot = commands.Bot(command_prefix=["_"], formatter=formatter,
-                   description=description, pm_help=None)
+class Bot(commands.Bot):
+    def __init__(self, *args, **kwargs):
 
-settings = Settings()
+        def prefix_manager(bot, message):
+            """
+            Returns prefixes of the message's server if set.
+            If none are set or if the message's server is None
+            it will return the global prefixes instead.
+
+            Requires a Bot instance and a Message object to be
+            passed as arguments.
+            """
+            return bot.settings.get_prefixes(message.server)
+
+        self.counter = Counter()
+        self.uptime = datetime.datetime.now()
+        self._message_modifiers = []
+        self.settings = Settings()
+        super().__init__(*args, command_prefix=prefix_manager, **kwargs)
+
+    async def send_message(self, *args, **kwargs):
+        if self._message_modifiers:
+            if "content" in kwargs:
+                pass
+            elif len(args) == 2:
+                args = list(args)
+                kwargs["content"] = args.pop()
+            else:
+                return await super().send_message(*args, **kwargs)
+
+            content = kwargs['content']
+            for m in self._message_modifiers:
+                try:
+                    content = str(m(content))
+                except:   # Faulty modifiers should not
+                    pass  # break send_message
+            kwargs['content'] = content
+
+        return await super().send_message(*args, **kwargs)
+
+    def add_message_modifier(self, func):
+        """
+        Adds a message modifier to the bot
+
+        A message modifier is a callable that accepts a message's
+        content as the first positional argument.
+        Before a message gets sent, func will get called with
+        the message's content as the only argument. The message's
+        content will then be modified to be the func's return
+        value.
+        Exceptions thrown by the callable will be catched and
+        silenced.
+        """
+        if not callable(func):
+            raise TypeError("The message modifier function "
+                            "must be a callable.")
+
+        self._message_modifiers.append(func)
+
+    def remove_message_modifier(self, func):
+        """Removes a message modifier from the bot"""
+        if func not in self._message_modifiers:
+            raise RuntimeError("Function not present in the message "
+                               "modifiers.")
+
+        self._message_modifiers.remove(func)
+
+    def clear_message_modifiers(self):
+        """Removes all message modifiers from the bot"""
+        self._message_modifiers.clear()
+
+    async def send_cmd_help(self, ctx):
+        if ctx.invoked_subcommand:
+            pages = bot.formatter.format_help_for(ctx, ctx.invoked_subcommand)
+            for page in pages:
+                await bot.send_message(ctx.message.channel, page)
+        else:
+            pages = bot.formatter.format_help_for(ctx, ctx.command)
+            for page in pages:
+                await bot.send_message(ctx.message.channel, page)
+
+    def user_allowed(self, message):
+        author = message.author
+
+        if author.bot or author == self.user:
+            return False
+
+        mod = self.get_cog('Mod')
+
+        if mod is not None:
+            if settings.owner == author.id:
+                return True
+            if not message.channel.is_private:
+                server = message.server
+                names = (settings.get_server_admin(
+                    server), settings.get_server_mod(server))
+                results = map(
+                    lambda name: discord.utils.get(author.roles, name=name),
+                    names)
+                for r in results:
+                    if r is not None:
+                        return True
+
+            if author.id in mod.blacklist_list:
+                return False
+
+            if mod.whitelist_list:
+                if author.id not in mod.whitelist_list:
+                    return False
+
+            if not message.channel.is_private:
+                if message.server.id in mod.ignore_list["SERVERS"]:
+                    return False
+
+                if message.channel.id in mod.ignore_list["CHANNELS"]:
+                    return False
+            return True
+        else:
+            return True
+
+
+class Formatter(commands.HelpFormatter):
+    def __init__(self, *args, **kwargs):
+        super().__init__(*args, **kwargs)
+
+    def _add_subcommands_to_page(self, max_width, commands):
+        for name, command in sorted(commands, key=lambda t: t[0]):
+            if name in command.aliases:
+                # skip aliases
+                continue
+
+            entry = '  {0:<{width}} {1}'.format(name, command.short_doc,
+                                                width=max_width)
+            shortened = self.shorten(entry)
+            self._paginator.add_line(shortened)
+
+
+formatter = Formatter(show_check_failure=False)
+
+bot = Bot(formatter=formatter, description=description, pm_help=None)
+
+send_cmd_help = bot.send_cmd_help  # Backwards
+user_allowed = bot.user_allowed    # compatibility
+
+settings = bot.settings
 
 
 @bot.event
@@ -38,8 +200,6 @@ async def on_ready():
     users = len(set(bot.get_all_members()))
     servers = len(bot.servers)
     channels = len([c for c in bot.get_all_channels()])
-    if not hasattr(bot, "uptime"):
-        bot.uptime = int(time.perf_counter())
     if settings.login_type == "token" and settings.owner == "id_here":
         await set_bot_owner()
     print('------')
@@ -51,8 +211,8 @@ async def on_ready():
     print("{} users".format(users))
     print("\n{}/{} active cogs with {} commands".format(
         len(bot.cogs), total_cogs, len(bot.commands)))
-    prefix_label = "Prefixes:" if len(bot.command_prefix) > 1 else "Prefix:"
-    print("{} {}\n".format(prefix_label, " ".join(bot.command_prefix)))
+    prefix_label = "Prefixes:" if len(settings.prefixes) > 1 else "Prefix:"
+    print("{} {}\n".format(prefix_label, " ".join(settings.prefixes)))
     if settings.login_type == "token":
         print("------")
         print("Use this url to bring your bot to a server:")
@@ -65,11 +225,12 @@ async def on_ready():
 
 @bot.event
 async def on_command(command, ctx):
-    pass
+    bot.counter["processed_commands"] += 1
 
 
 @bot.event
 async def on_message(message):
+    bot.counter["messages_read"] += 1
     if user_allowed(message):
         await bot.process_commands(message)
 
@@ -100,70 +261,21 @@ async def on_command_error(error, ctx):
     else:
         logger.exception(type(error).__name__, exc_info=error)
 
-async def send_cmd_help(ctx):
-    if ctx.invoked_subcommand:
-        pages = bot.formatter.format_help_for(ctx, ctx.invoked_subcommand)
-        for page in pages:
-            await bot.send_message(ctx.message.channel, page)
-    else:
-        pages = bot.formatter.format_help_for(ctx, ctx.command)
-        for page in pages:
-            await bot.send_message(ctx.message.channel, page)
-
-
-def user_allowed(message):
-
-    author = message.author
-
-    mod = bot.get_cog('Mod')
-
-    if author.bot:
-        return False
-
-    if mod is not None:
-        if settings.owner == author.id:
-            return True
-        if not message.channel.is_private:
-            server = message.server
-            names = (settings.get_server_admin(
-                server), settings.get_server_mod(server))
-            results = map(
-                lambda name: discord.utils.get(author.roles, name=name), names)
-            for r in results:
-                if r is not None:
-                    return True
-
-        if author.id in mod.blacklist_list:
-            return False
-
-        if mod.whitelist_list:
-            if author.id not in mod.whitelist_list:
-                return False
-
-        if not message.channel.is_private:
-            if message.server.id in mod.ignore_list["SERVERS"]:
-                return False
-
-            if message.channel.id in mod.ignore_list["CHANNELS"]:
-                return False
-        return True
-    else:
-        return True
-
 
 async def get_oauth_url():
     try:
         data = await bot.application_info()
-    except AttributeError:
-        return "Your discord.py is outdated. Couldn't retrieve invite link."
+    except Exception as e:
+        return "Couldn't retrieve invite link.Error: {}".format(e)
     return discord.utils.oauth_url(data.id)
+
 
 async def set_bot_owner():
     try:
         data = await bot.application_info()
         settings.owner = data.owner.id
-    except AttributeError:
-        print("Your discord.py is outdated. Couldn't retrieve owner's ID.")
+    except Exception as e:
+        print("Couldn't retrieve owner's ID. Error: {}".format(e))
         return
     print("{} has been recognized and set as owner.".format(data.owner.name))
 
@@ -200,8 +312,8 @@ def check_configs():
                   "process.")
             exit(1)
 
-        print("\nChoose a prefix. A prefix is what you type before a command.\n"
-              "A typical prefix would be the exclamation mark.\n"
+        print("\nChoose a prefix. A prefix is what you type before a command."
+              "\nA typical prefix would be the exclamation mark.\n"
               "Can be multiple characters. You will be able to change it "
               "later and add more of them.\nChoose your prefix:")
         confirmation = False
@@ -209,47 +321,51 @@ def check_configs():
             new_prefix = ensure_reply("\nPrefix> ").strip()
             print("\nAre you sure you want {0} as your prefix?\nYou "
                   "will be able to issue commands like this: {0}help"
-                  "\nType yes to confirm or no to change it".format(new_prefix))
+                  "\nType yes to confirm or no to change it".format(
+                      new_prefix))
             confirmation = get_answer()
 
         settings.prefixes = [new_prefix]
         if settings.login_type == "email":
-            print("\nOnce you're done with the configuration, you will have to type "
-                  "'{}set owner' *in Discord's chat*\nto set yourself as owner.\n"
-                  "Press enter to continue".format(new_prefix))
-            settings.owner = input("") # Shh, they will never know it's here
+            print("\nOnce you're done with the configuration, you will have to"
+                  " type '{}set owner' *in Discord's chat*\nto set yourself as"
+                  " owner.\nPress enter to continue".format(new_prefix))
+            settings.owner = input("")  # Shh, they will never know it's here
             if settings.owner == "":
                 settings.owner = "id_here"
             if not settings.owner.isdigit() or len(settings.owner) < 17:
                 if settings.owner != "id_here":
                     print("\nERROR: What you entered is not a valid ID. Set "
-                          "yourself as owner later with {}set owner".format(new_prefix))
+                          "yourself as owner later with {}set owner".format(
+                              new_prefix))
                 settings.owner = "id_here"
         else:
             settings.owner = "id_here"
 
-        print("\nInput the admin role's name. Anyone with this role in Discord will be "
-              "able to use the bot's admin commands")
+        print("\nInput the admin role's name. Anyone with this role in Discord"
+              " will be able to use the bot's admin commands")
         print("Leave blank for default name (Transistor)")
         settings.default_admin = input("\nAdmin role> ")
         if settings.default_admin == "":
             settings.default_admin = "Transistor"
 
-        print("\nInput the moderator role's name. Anyone with this role in Discord will "
-              "be able to use the bot's mod commands")
+        print("\nInput the moderator role's name. Anyone with this role in"
+              " Discord will be able to use the bot's mod commands")
         print("Leave blank for default name (Process)")
         settings.default_mod = input("\nModerator role> ")
         if settings.default_mod == "":
             settings.default_mod = "Process"
 
-        print("\nThe configuration is done. Leave this window always open to keep "
-              "Red online.\nAll commands will have to be issued through Discord's "
-              "chat, *this window will now be read only*.\nPress enter to continue")
+        print("\nThe configuration is done. Leave this window always open to"
+              " keep Red online.\nAll commands will have to be issued through"
+              " Discord's chat, *this window will now be read only*.\nPress"
+              " enter to continue")
         input("\n")
 
     if not os.path.isfile("data/red/cogs.json"):
         print("Creating new cogs.json...")
         dataIO.save_json("data/red/cogs.json", {})
+
 
 def set_logger():
     global logger
@@ -283,11 +399,13 @@ def set_logger():
     logger.addHandler(fhandler)
     logger.addHandler(stdout_handler)
 
+
 def ensure_reply(msg):
     choice = ""
     while choice == "":
         choice = input(msg)
     return choice
+
 
 def get_answer():
     choices = ("yes", "y", "no", "n")
@@ -299,19 +417,15 @@ def get_answer():
     else:
         return False
 
+
 def set_cog(cog, value):
     data = dataIO.load_json("data/red/cogs.json")
     data[cog] = value
     dataIO.save_json("data/red/cogs.json", data)
 
+
 def load_cogs():
-    try:
-        if sys.argv[1] == "--no-prompt":
-            no_prompt = True
-        else:
-            no_prompt = False
-    except:
-        no_prompt = False
+    no_prompt = "--no-prompt" in sys.argv[1:]
 
     try:
         registry = dataIO.load_json("data/red/cogs.json")
@@ -374,18 +488,16 @@ def main():
     check_configs()
     set_logger()
     owner_cog = load_cogs()
-    if settings.prefixes != []:
-        bot.command_prefix = settings.prefixes
-    else:
+    if settings.prefixes == []:
         print("No prefix set. Defaulting to !")
-        bot.command_prefix = ["!"]
+        settings.prefixes = ["!"]
         if settings.owner != "id_here":
             print("Use !set prefix to set it.")
         else:
             print("Once you're owner use !set prefix to set it.")
     if settings.owner == "id_here" and settings.login_type == "email":
         print("Owner has not been set yet. Do '{}set owner' in chat to set "
-              "yourself as owner.".format(bot.command_prefix[0]))
+              "yourself as owner.".format(settings.prefixes[0]))
     else:
         owner_cog.owner.hidden = True  # Hides the set owner command from help
     print("-- Logging in.. --")
@@ -398,37 +510,36 @@ def main():
               "discord.py@master#egg=discord.py[voice]")
     print("Official server: https://discord.me/Red-DiscordBot")
     if settings.login_type == "token":
-        try:
-            yield from bot.login(settings.email)
-        except TypeError as e:
-            print(e)
-            msg = ("\nYou are using an outdated discord.py.\n"
-                   "update your discord.py with by running this in your cmd "
-                   "prompt/terminal.\npip3 install --upgrade git+https://"
-                   "github.com/Rapptz/discord.py@async")
-            sys.exit(msg)
+        yield from bot.login(settings.email)
     else:
         yield from bot.login(settings.email, settings.password)
     yield from bot.connect()
 
 if __name__ == '__main__':
+    error = False
     loop = asyncio.get_event_loop()
     try:
         loop.run_until_complete(main())
     except discord.LoginFailure:
+        error = True
         logger.error(traceback.format_exc())
         choice = input("Invalid login credentials. "
-            "If they worked before Discord might be having temporary "
-            "technical issues.\nIn this case, press enter and "
-            "try again later.\nOtherwise you can type 'reset' to "
-            "delete the current configuration and redo the setup process "
-            "again the next start.\n> ")
+                       "If they worked before Discord might be having temporary "
+                       "technical issues.\nIn this case, press enter and "
+                       "try again later.\nOtherwise you can type 'reset' to "
+                       "delete the current configuration and redo the setup process "
+                       "again the next start.\n> ")
         if choice.strip() == "reset":
             shutil.copy('data/red/settings.json',
                         'data/red/settings-{}.bak'.format(int(time.time())))
             os.remove('data/red/settings.json')
+    except KeyboardInterrupt:
+        loop.run_until_complete(bot.logout())
     except:
+        error = True
         logger.error(traceback.format_exc())
         loop.run_until_complete(bot.logout())
     finally:
         loop.close()
+        if error:
+            exit(1)

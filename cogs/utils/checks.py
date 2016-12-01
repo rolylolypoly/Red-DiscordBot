@@ -1,7 +1,5 @@
 from discord.ext import commands
 import discord.utils
-from cogs.utils.settings import Settings
-from cogs.utils.dataIO import fileIO
 from __main__ import settings
 
 #
@@ -30,6 +28,8 @@ def is_owner():
 def check_permissions(ctx, perms):
     if is_owner_check(ctx):
         return True
+    elif not perms:
+        return False
 
     ch = ctx.message.channel
     author = ctx.message.author
@@ -77,3 +77,12 @@ def serverowner_or_permissions(**perms):
 
         return check_permissions(ctx,perms)
     return commands.check(predicate)
+
+def serverowner():
+    return serverowner_or_permissions()
+
+def admin():
+    return admin_or_permissions()
+
+def mod():
+    return mod_or_permissions()
