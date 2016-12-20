@@ -26,7 +26,7 @@ class DB:
         try:
             c.execute(
                 'SELECT * FROM {tn}'
-            )
+            ).__format__(tn=table)
             results = c.fetchall()
             await self.bot.say(results)
 
