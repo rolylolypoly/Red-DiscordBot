@@ -6,6 +6,7 @@ from random import shuffle, choice
 from cogs.utils.dataIO import dataIO
 from cogs.utils import checks
 from __main__ import send_cmd_help, settings
+from json import JSONDecodeError
 import re
 import logging
 import collections
@@ -239,7 +240,7 @@ class Audio:
         self.downloaders = {}  # sid: object
         self.settings = dataIO.load_json("data/audio/settings.json")
         self.server_specific_setting_keys = ["VOLUME", "VOTE_ENABLED",
-                                             "VOTE_THRESHOLD"]
+                                             "VOTE_THRESHOLD", "NOPPL_DISCONNECT"]
         self.cache_path = "data/audio/cache"
         self.local_playlist_path = "data/audio/localtracks"
         self._old_game = False
@@ -992,6 +993,24 @@ class Audio:
         await self.bot.say("Max cache size set to {} MB.".format(size))
         self.save_settings()
 
+    @audioset.command(name="emptydisconnect", pass_context=True)
+    @checks.mod_or_permissions(manage_messages=True)
+    async def audioset_emptydisconnect(self, ctx):
+        """Toggles auto disconnection when everyone leaves the channel"""
+        server = ctx.message.server
+        settings = self.get_server_settings(server.id)
+        noppl_disconnect = settings.get("NOPPL_DISCONNECT", True)
+        self.set_server_setting(server, "NOPPL_DISCONNECT",
+                                not noppl_disconnect)
+        if not noppl_disconnect:
+            await self.bot.say("If there is no one left in the voice channel"
+                               " the bot will automatically disconnect after"
+                               " five minutes.")
+        else:
+            await self.bot.say("The bot will no longer auto disconnect"
+                               " if the voice channel is empty.")
+        self.save_settings()
+
     @audioset.command(name="maxlength")
     @checks.is_owner()
     async def audioset_maxlength(self, length: int):
@@ -1728,6 +1747,7 @@ class Audio:
         mod_role = settings.get_server_mod(server)
 
         is_owner = member.id == settings.owner
+        is_server_owner = member == server.owner
         is_admin = discord.utils.get(member.roles, name=admin_role) is not None
         is_mod = discord.utils.get(member.roles, name=mod_role) is not None
 
@@ -1735,7 +1755,7 @@ class Audio:
         nonbots = sum(not m.bot for m in member.voice_channel.voice_members)
         alone = nonbots <= 1
 
-        return is_owner or is_admin or is_mod or alone
+        return is_owner or is_server_owner or is_admin or is_mod or alone
 
     @commands.command(pass_context=True, no_pm=True)
     async def sing(self, ctx):
@@ -1849,11 +1869,18 @@ class Audio:
                     stop_times[server] = int(time.time())
 
                 if hasattr(vc, 'audio_player'):
-                    if (vc.audio_player.is_done() or len(vc.channel.voice_members) == 1):
+                    if vc.audio_player.is_done():
                         if server not in stop_times or stop_times[server] is None:
                             log.debug("putting sid {} in stop loop".format(server.id))
                             stop_times[server] = int(time.time())
-                    elif vc.audio_player.is_playing():
+
+                    noppl_disconnect = self.get_server_settings(server)
+                    noppl_disconnect = noppl_disconnect.get("NOPPL_DISCONNECT", True)
+                    if noppl_disconnect and len(vc.channel.voice_members) == 1:
+                        if server not in stop_times or stop_times[server] is None:
+                            log.debug("putting sid {} in stop loop".format(server.id))
+                            stop_times[server] = int(time.time())
+                    elif not vc.audio_player.is_done():
                         stop_times[server] = None
 
             for server in stop_times:
@@ -1875,6 +1902,11 @@ class Audio:
         if sid not in self.settings["SERVERS"]:
             self.settings["SERVERS"][sid] = {}
         ret = self.settings["SERVERS"][sid]
+
+        # Not the cleanest way. Some refactoring is suggested if more settings
+        # have to be added
+        if "NOPPL_DISCONNECT" not in ret:
+            ret["NOPPL_DISCONNECT"] = True
 
         for setting in self.server_specific_setting_keys:
             if setting not in ret:
@@ -2057,7 +2089,13 @@ def check_files():
         print("Creating default audio settings.json...")
         dataIO.save_json(settings_path, default)
     else:  # consistency check
-        current = dataIO.load_json(settings_path)
+        try:
+            current = dataIO.load_json(settings_path)
+        except JSONDecodeError:
+            # settings.json keeps getting corrupted for unknown reasons. Let's
+            # try to keep it from making the cog load fail.
+            dataIO.save_json(settings_path, default)
+            current = dataIO.load_json(settings_path)
         if current.keys() != default.keys():
             for key in default.keys():
                 if key not in current.keys():
