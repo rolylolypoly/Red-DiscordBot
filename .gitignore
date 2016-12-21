@@ -8,3 +8,4 @@ data
 *.dll
 .idea
 data.txt
+data.sqlite
